@@ -5,7 +5,8 @@ export default defineConfig({
   fullyParallel: true,
   reporter: "list",
   use: {
-    baseURL: "http://127.0.0.1:4173/pdf-workbench/",
+    baseURL:
+      process.env.PLAYWRIGHT_BASE_URL ?? "http://127.0.0.1:4173/pdf-workbench/",
     trace: "on-first-retry",
   },
   projects: [
