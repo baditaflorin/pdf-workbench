@@ -10,7 +10,7 @@ Mode A has no server logs. Production browser logs should be minimal.
 
 ## Decision
 
-Use visible UI status, toasts, and error panels for user-facing operations. Avoid production `console.log`. Use `console.error` only for unrecoverable developer diagnostics caught by the global error boundary.
+Use visible UI status, toasts, and error panels for user-facing operations. Avoid production `console.log`. Use `console.error` only for unrecoverable developer diagnostics in development.
 
 ## Consequences
 

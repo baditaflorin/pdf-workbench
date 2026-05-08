@@ -1,10 +1,25 @@
-.PHONY: help install-hooks dev build test test-integration smoke lint fmt pages-preview release clean
+.PHONY: help install-hooks hooks-pre-commit hooks-commit-msg hooks-pre-push hooks-post-merge hooks-post-checkout dev build test test-integration smoke lint fmt pages-preview release clean
 
 help:
 	@awk 'BEGIN {FS = ":.*##"} /^[a-zA-Z0-9_-]+:.*##/ {printf "%-20s %s\n", $$1, $$2}' $(MAKEFILE_LIST)
 
 install-hooks: ## wire local git hooks
 	git config core.hooksPath .githooks
+
+hooks-pre-commit: ## run pre-commit hook manually
+	.githooks/pre-commit
+
+hooks-commit-msg: ## validate a sample commit message
+	printf "feat: sample\n" >/tmp/pdf-workbench-commit-msg && .githooks/commit-msg /tmp/pdf-workbench-commit-msg
+
+hooks-pre-push: ## run pre-push hook manually
+	.githooks/pre-push
+
+hooks-post-merge: ## run post-merge hook manually
+	.githooks/post-merge
+
+hooks-post-checkout: ## run post-checkout hook manually
+	.githooks/post-checkout
 
 dev: ## run the frontend dev server
 	npm run dev

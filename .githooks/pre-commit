@@ -1,0 +1,10 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+make lint
+
+if command -v gitleaks >/dev/null 2>&1; then
+  gitleaks protect --staged --redact
+else
+  echo "gitleaks is not installed; skipping staged secret scan."
+fi
