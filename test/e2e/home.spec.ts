@@ -2,7 +2,7 @@ import { expect, test } from "@playwright/test";
 import { PDFDocument, StandardFonts, rgb } from "pdf-lib";
 
 test("loads the workbench and opens a PDF locally", async ({ page }) => {
-  await page.goto("/");
+  await page.goto("./");
 
   await expect(
     page.getByRole("heading", { name: /Open a PDF and work locally/i }),
