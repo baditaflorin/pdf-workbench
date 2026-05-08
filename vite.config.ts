@@ -1,20 +1,9 @@
-import { execSync } from "node:child_process";
 import tailwindcss from "@tailwindcss/vite";
 import react from "@vitejs/plugin-react";
 import { defineConfig } from "vite";
 
 const version = process.env.npm_package_version ?? "0.0.0";
-
-function readGitValue(command: string, fallback: string) {
-  try {
-    return execSync(command, {
-      encoding: "utf8",
-      stdio: ["ignore", "pipe", "ignore"],
-    }).trim();
-  } catch {
-    return fallback;
-  }
-}
+const commit = process.env.VITE_COMMIT_SHA ?? "main";
 
 // https://vite.dev/config/
 export default defineConfig({
@@ -27,9 +16,7 @@ export default defineConfig({
   },
   define: {
     __APP_VERSION__: JSON.stringify(version),
-    __COMMIT_SHA__: JSON.stringify(
-      readGitValue("git rev-parse --short HEAD", "dev"),
-    ),
+    __COMMIT_SHA__: JSON.stringify(commit),
     __REPO_URL__: JSON.stringify(
       "https://github.com/baditaflorin/pdf-workbench",
     ),
