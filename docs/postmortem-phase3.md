@@ -1,6 +1,6 @@
 # Phase 3 Postmortem
 
-Version: v0.3.0
+Version: v0.3.1
 
 Live site: https://baditaflorin.github.io/pdf-workbench/
 
@@ -46,7 +46,7 @@ Full notes: docs/phase3/stranger-test.md
 
 Fixed:
 
-1. README badge now tracks v0.3.0.
+1. README badge now tracks v0.3.1.
 2. README lists state archive, autosave, copy, print, drag/drop, paste, and batch intake.
 3. Privacy doc now says active PDF bytes are stored locally when autosave is enabled.
 4. Architecture doc now shows project archive and IndexedDB active state.

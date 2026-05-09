@@ -40,4 +40,4 @@ Status: implemented autonomously
 2. Live GitHub Pages smoke passes.
 3. State export/import round-trip is tested.
 4. New input/output audit rows are updated to green or ADR-out-of-scope.
-5. Version is bumped to v0.3.0 and tagged.
+5. Version is bumped to v0.3.1 and tagged.

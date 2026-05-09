@@ -30,7 +30,7 @@ Status: updated after Phase 3 implementation
 
 ## Top 5 Documentation/Reality Mismatches
 
-1. README badge was stale; fixed during v0.3.0 release update.
+1. README badge was stale; fixed during v0.3.1 release update.
 2. Privacy doc said original bytes were not persisted; fixed to describe local autosave.
 3. Architecture doc said IndexedDB metadata only; fixed to describe active archive/settings.
 4. Recent history implied more than it did; UI/docs now distinguish recents from restorable state.

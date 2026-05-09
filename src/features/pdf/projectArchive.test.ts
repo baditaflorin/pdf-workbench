@@ -8,7 +8,7 @@ describe("project archive", () => {
     const archive = exportProjectArchive(
       project,
       "page-1",
-      "0.3.0",
+      "0.3.1",
       "test-commit",
       "2026-05-09T00:00:00.000Z",
     );

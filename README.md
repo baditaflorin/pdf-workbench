@@ -1,6 +1,6 @@
 # PDF Workbench
 
-![Version](https://img.shields.io/badge/version-0.3.0-143f4a)
+![Version](https://img.shields.io/badge/version-0.3.1-143f4a)
 ![Deployment](https://img.shields.io/badge/deploy-GitHub%20Pages-2f6f7a)
 ![Mode](https://img.shields.io/badge/mode-local--first-c46534)
 
