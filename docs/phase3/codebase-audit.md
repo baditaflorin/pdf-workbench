@@ -1,51 +1,76 @@
 # Phase 3 Codebase Health Audit
 
-Status: baseline before Phase 3 implementation
+Status: updated after Phase 3 implementation
 
 ## Measurements
 
-Largest modules:
+Largest modules after implementation:
 
 | File | Lines | Finding |
 |---|---:|---|
-| `src/features/pdf/PdfWorkbench.tsx` | 1306 | God component: state orchestration, inputs, outputs, persistence hooks, controls, and presentational panels. |
-| `src/features/pdf/pdfIntelligence.ts` | 801 | Large but coherent domain inference module. |
-| `src/index.css` | 824 | Single stylesheet; acceptable for current app but growing. |
+| `src/features/pdf/PdfWorkbench.tsx` | 1862 | Still too large. Phase 3 added real pathways faster than it split UI orchestration. This remains the largest Phase 4 refactor candidate. |
+| `src/index.css` | 916 | Single stylesheet grew with print, batch, drag, and settings states. Acceptable for static app, but should split once a design system exists. |
+| `src/features/pdf/pdfIntelligence.ts` | 801 | Large but coherent domain inference module. No Phase 3 changes. |
 | `src/features/pdf/formIntelligence.ts` | 413 | Coherent form heuristics module. |
+| `src/features/pdf/projectArchive.ts` | 313 | New single boundary for versioned state import/export and zod validation. |
 
 ## DRY Violations
 
-1. PDF form-field reading is duplicated between `src/features/pdf/pdfDocument.ts` and `src/features/pdf/pdfIntelligence.test.ts`.
-2. Download/export naming lives in UI code rather than a single project archive/export module.
-3. User-facing operation errors are mostly canonical, but `ErrorBoundary` still exposes raw React error text.
+Before: 3 known issues.
+
+After:
+
+1. PDF form-field reading duplication was removed; tests now use `readFormFields` from `src/features/pdf/pdfDocument.ts`.
+2. Project state naming, schema, bytes encoding, and canonical round-trip logic now live in `src/features/pdf/projectArchive.ts`.
+3. New import/export errors use the existing `PdfUserError` what/why/next-step pattern.
+
+Remaining accepted duplication: a few UI button layouts are repeated in `PdfWorkbench.tsx`. They are presentational and are not core logic.
 
 ## SOLID Violations
 
-1. `PdfWorkbench.tsx` has many reasons to change: file input, operation state, document actions, exports, panels, settings-like debug behavior, and recent history.
-2. Persistence is metadata-only and coupled directly to UI.
-3. Project state has no stable import/export boundary.
+Closed:
+
+1. Project archive import/export is now a separate module with tests.
+2. Storage owns recent metadata, active project archive, and settings through one IndexedDB boundary.
+3. External JSON state is validated at the boundary before the UI sees it.
+
+Still open:
+
+1. `PdfWorkbench.tsx` remains a god component. It is usable and tested, but future Phase 4 work should split file intake, export actions, settings, and panels into focused hooks/components.
 
 ## Dead Code
 
-1. `src/lib/errors.ts` remains only for `PagePreview`; it is not the canonical PDF user error path.
-2. `src/assets/react.svg` and `src/assets/vite.svg` are unused starter assets.
+Before: 2 known issues.
+
+After:
+
+1. `src/assets/react.svg` and `src/assets/vite.svg` were deleted.
+2. `src/lib/errors.ts` remains because `PagePreview` still uses it for renderer-level failures; it is not dead.
 
 ## TODO/FIXME/XXX/HACK
 
-No production TODO/FIXME/XXX/HACK markers were found. Text matches in generated assets were ignored.
+No production TODO/FIXME/XXX/HACK markers were found. Generated Pages assets were excluded from this scan.
 
 ## Type Safety Holes
 
-No `any` or `@ts-ignore` appears in authored `src` files. Boundary JSON parsing for future state import does not exist yet and must use zod.
+No `any` or `@ts-ignore` appears in authored `src` files. Imported project-state JSON is parsed as `unknown` and validated with zod.
 
 ## Inconsistent Patterns
 
-1. Recent metadata uses IndexedDB, while active project state is memory-only.
-2. Exports are spread between UI and conversion helpers.
-3. Debug is controlled only by URL query, not user settings.
+Before: 3 known issues.
 
-## Test Coverage Holes
+After:
 
-1. No tests for drag/drop, paste, sample loading, project state export/import, clear state, or autosave restore.
-2. Smoke test covers opening a generated PDF but not taking work back out.
-3. Real-data fixture tests cover intelligence, not end-to-end state persistence.
+1. Browser persistence now consistently goes through `src/lib/storage.ts`.
+2. State archive serialization consistently goes through `src/features/pdf/projectArchive.ts`.
+3. Debug is controllable by URL query or persisted setting.
+
+## Test Coverage
+
+Added:
+
+1. Unit coverage for project archive export/import round-trip and malformed archive rejection.
+2. E2E smoke coverage for state download, clear project, and state re-import.
+3. Real-data fixture tests continue to cover intelligence determinism.
+
+Remaining gap: drag/drop and Clipboard API paths are implemented through the same intake functions but are not separately automated across operating systems.

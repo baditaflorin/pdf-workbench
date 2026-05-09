@@ -1,19 +1,21 @@
 # Phase 3 Output Pathway Audit
 
-Status: baseline before Phase 3 implementation
+Status: updated after Phase 3 implementation
 
-| Output pathway | Baseline status | Finding | Phase 3 decision |
+| Output pathway | Baseline status | Final status | Evidence |
 |---|---|---|---|
-| Edited PDF download | Works fully | Exports visible edits, form values, page order, and flattened forms. | Keep and test. |
-| TXT export | Works partially | Requires text extraction/OCR and downloads, but no copy shortcut. | Finish copy-to-clipboard. |
-| Markdown export | Works partially | Downloads with metadata, but no state round-trip. | Keep. |
-| HTML export | Works partially | Downloads with metadata, but print route is not explicit. | Keep. |
-| Project state download | Not built | User cannot save a workbench project and reload later. | Finish versioned `.pdfwb.json`. |
-| Project state import | Not built | Export round-trip is impossible. | Finish. |
-| Copy-to-clipboard | Not built | Users often need text in email/docs/chat rather than a file. | Finish. |
-| JSON/automation-ready output | Not built | No stable state artifact for external tooling. | Finish through versioned project JSON. |
-| Print-friendly | Not built | Browser print prints the whole app chrome. | Finish basic print mode for preview/work state. |
-| Share link | Not built | Unsafe for private PDFs and too large for real documents. | Out of scope. |
-| Screenshot/embed/API/curl | Not built | Static local-only PDF tool has no runtime API and should not imply one. | Out of scope. |
+| Edited PDF download | Works fully | Green | Existing export path still covered by smoke and manual build checks. |
+| TXT export | Works partially | Green | Text download remains available after extraction/OCR; Copy button adds direct clipboard exit. |
+| Markdown export | Works partially | Green | Markdown export includes metadata and remains unchanged. |
+| HTML export | Works partially | Green | HTML export remains available; print route is explicit. |
+| Project state download | Not built | Green | State button downloads a versioned `.pdfwb.json` archive with PDF bytes, edits, fields, text, OCR, activity, version, and commit. |
+| Project state import | Not built | Green | Archive import restores canonical project state; unit and Playwright smoke cover round-trip. |
+| Copy-to-clipboard | Not built | Green | Copy writes extracted/OCR text and reports permission failures with a next step. |
+| JSON/automation-ready output | Not built | Green | Project archive schema is zod-validated and documented as `pdf-workbench.project.v1`. |
+| Print-friendly | Not built | Green | Print action calls browser print and print CSS suppresses app chrome. |
+| Share link | Not built | Out of scope | ADR 0062 rejects private document state in URLs. |
+| Screenshot/embed/API/curl | Not built | Out of scope | Mode A has no runtime API; screenshot/embed outputs are not product claims. |
 
-Baseline counts: green 1, yellow 3, red 5, out of scope 2.
+Before: green 1, yellow 3, red 5, out of scope 2.
+
+After: green 9, yellow 0, red 0, out of scope 2.

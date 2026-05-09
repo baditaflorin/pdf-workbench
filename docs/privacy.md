@@ -18,15 +18,16 @@ PDF Workbench is designed so documents stay in the browser.
 
 ## Local Storage
 
-The app stores recent project metadata in IndexedDB:
+The app stores data only in this browser's IndexedDB:
 
-- file name
-- page count
-- OCR page count
-- last updated timestamp
+- active project archive when autosave is enabled
+- original PDF bytes inside that local active project archive
+- page order, rotations, deletions, form values, text stamps, visible signature appearances, OCR text, extracted text, activity log, document intelligence, app version, and commit
+- recent project metadata: file name, page count, OCR page count, last updated timestamp
+- settings: autosave, debug panel, destructive-action confirmation
 
-Original PDF bytes are kept in memory during the session and are not persisted automatically in v1.
+The active project archive never leaves the browser unless you explicitly download or share the `.pdfwb.json` file yourself. Use Clear project to remove the active archive, and Clear recent to remove recent metadata.
 
 ## Analytics
 
-No analytics, tracking beacons, remote logs, or user identifiers are included in v1.
+No analytics, tracking beacons, remote logs, or user identifiers are included.
