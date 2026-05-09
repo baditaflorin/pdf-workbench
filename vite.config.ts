@@ -1,21 +1,9 @@
 import tailwindcss from "@tailwindcss/vite";
 import react from "@vitejs/plugin-react";
-import { execSync } from "node:child_process";
 import { defineConfig } from "vite";
 
 const version = process.env.npm_package_version ?? "0.0.0";
-const commit = process.env.VITE_COMMIT_SHA ?? readGitCommit();
-
-function readGitCommit() {
-  try {
-    return execSync("git rev-parse --short HEAD", {
-      encoding: "utf8",
-      stdio: ["ignore", "pipe", "ignore"],
-    }).trim();
-  } catch {
-    return "unknown";
-  }
-}
+const commit = process.env.VITE_COMMIT_SHA ?? "0c4eb69";
 
 // https://vite.dev/config/
 export default defineConfig({
