@@ -11,6 +11,8 @@ import {
 } from "pdf-lib";
 import type { PDFFont, PDFPage } from "pdf-lib";
 import { createPageStates, visiblePages } from "./pdfState";
+import { enhanceFormFields } from "./formIntelligence";
+import { buildPdfIntelligence, buildSourceId } from "./pdfIntelligence";
 import type {
   PdfFormField,
   PdfProject,
@@ -22,10 +24,27 @@ export async function loadPdfFile(file: File): Promise<PdfProject> {
   const bytes = new Uint8Array(await file.arrayBuffer());
   const doc = await PDFDocument.load(bytes);
   const pages = doc.getPages();
+  const loadedAt = new Date().toISOString();
+  const sourceId = buildSourceId(file.name, bytes);
+  const fields = enhanceFormFields(readFormFields(doc), {
+    fileName: file.name,
+  });
+  const intelligence = buildPdfIntelligence({
+    fileName: file.name,
+    sizeBytes: bytes.byteLength,
+    pageCount: pages.length,
+    sourceId,
+    fields,
+    sampleText: "",
+    pagesSampled: 0,
+    analyzedAt: loadedAt,
+  });
 
   return {
     id: crypto.randomUUID(),
+    sourceId,
     fileName: file.name,
+    sizeBytes: bytes.byteLength,
     bytes,
     pages: createPageStates(
       pages.map((page) => ({
@@ -33,12 +52,22 @@ export async function loadPdfFile(file: File): Promise<PdfProject> {
         rotation: page.getRotation().angle,
       })),
     ),
-    fields: readFormFields(doc),
+    fields,
     textStamps: [],
     signatureStamps: [],
     ocrResults: [],
     embeddedText: "",
-    loadedAt: new Date().toISOString(),
+    intelligence,
+    activityLog: [
+      {
+        id: `${sourceId}-open`,
+        at: loadedAt,
+        kind: "open",
+        message: `Opened ${file.name}`,
+        detail: `${pages.length} page(s), ${fields.length} form field(s)`,
+      },
+    ],
+    loadedAt,
   };
 }
 

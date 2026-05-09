@@ -52,6 +52,10 @@ export async function renderPdfPageToBlob(
 export async function extractEmbeddedText(
   bytes: Uint8Array,
   pageIndex?: number,
+  options: {
+    signal?: AbortSignal;
+    onProgress?: (message: string) => void;
+  } = {},
 ) {
   const loadingTask = getDocument({ data: bytes.slice() });
   const pdf = await loadingTask.promise;
@@ -62,7 +66,11 @@ export async function extractEmbeddedText(
   const chunks: string[] = [];
 
   try {
-    for (const pageNumber of pageNumbers) {
+    for (const [index, pageNumber] of pageNumbers.entries()) {
+      throwIfAborted(options.signal);
+      options.onProgress?.(
+        `Extracting embedded text ${index + 1}/${pageNumbers.length}...`,
+      );
       const page = await pdf.getPage(pageNumber);
       const content = await page.getTextContent();
       const text = content.items
@@ -80,4 +88,45 @@ export async function extractEmbeddedText(
   }
 
   return chunks.join("\n\n");
+}
+
+export async function extractTextSample(
+  bytes: Uint8Array,
+  maxPages = 3,
+  options: { signal?: AbortSignal } = {},
+) {
+  const loadingTask = getDocument({ data: bytes.slice() });
+  const pdf = await loadingTask.promise;
+  const pagesToSample = Math.min(pdf.numPages, maxPages);
+  const chunks: string[] = [];
+
+  try {
+    for (let pageNumber = 1; pageNumber <= pagesToSample; pageNumber += 1) {
+      throwIfAborted(options.signal);
+      const page = await pdf.getPage(pageNumber);
+      const content = await page.getTextContent();
+      const text = content.items
+        .map((item) => ("str" in item ? (item as TextItem).str : ""))
+        .join(" ")
+        .replace(/\s+/g, " ")
+        .trim();
+
+      if (text) {
+        chunks.push(text);
+      }
+    }
+  } finally {
+    await pdf.destroy();
+  }
+
+  return {
+    text: chunks.join("\n\n"),
+    pagesSampled: pagesToSample,
+  };
+}
+
+function throwIfAborted(signal: AbortSignal | undefined) {
+  if (signal?.aborted) {
+    throw new DOMException("Operation cancelled.", "AbortError");
+  }
 }

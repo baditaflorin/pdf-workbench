@@ -18,7 +18,9 @@ test("loads the workbench and opens a PDF locally", async ({ page }) => {
     buffer: await makeSamplePdf(),
   });
 
-  await expect(page.getByText(/Opened sample.pdf/i)).toBeVisible();
+  await expect(
+    page.locator(".status-row").getByText(/Opened sample.pdf/i),
+  ).toBeVisible();
   await expect(page.getByRole("heading", { name: "Page 1" })).toBeVisible();
   await expect(page.getByLabel("Selected PDF page preview")).toBeVisible();
   await expect(

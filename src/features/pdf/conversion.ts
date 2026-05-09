@@ -1,9 +1,31 @@
-import type { OcrResult } from "./types";
+import type { OcrResult, PdfIntelligence } from "./types";
 
-export function buildPlainText(embeddedText: string, ocrResults: OcrResult[]) {
+export type ExportMetadata = {
+  sourceId: string;
+  fileName: string;
+  appVersion: string;
+  commit: string;
+  schemaVersion: string;
+  generatedAt: string;
+  shape: string;
+  conditions: string[];
+  primaryAction: string;
+};
+
+export function buildPlainText(
+  embeddedText: string,
+  ocrResults: OcrResult[],
+  metadata?: ExportMetadata,
+) {
   const sections = [
+    metadata ? buildTextMetadata(metadata) : "",
     embeddedText.trim(),
-    ...ocrResults.map((result) => `${result.pageLabel}\n${result.text}`),
+    ...ocrResults.map(
+      (result) =>
+        `${result.pageLabel} OCR\nConfidence: ${result.confidence}%\nEngine: ${
+          result.engine ?? "tesseract.js"
+        }\nLanguage: ${result.language ?? "eng"}\n\n${result.text}`,
+    ),
   ]
     .map((section) => section.trim())
     .filter(Boolean);
@@ -15,11 +37,33 @@ export function buildMarkdown(
   fileName: string,
   embeddedText: string,
   ocrResults: OcrResult[],
+  metadata?: ExportMetadata,
 ) {
-  const sections = [`# ${fileName}`, embeddedText.trim()];
+  const sections = [`# ${fileName}`];
+
+  if (metadata) {
+    sections.push(
+      "## Export metadata",
+      [
+        `- Source ID: ${metadata.sourceId}`,
+        `- App version: ${metadata.appVersion}`,
+        `- Commit: ${metadata.commit}`,
+        `- Schema: ${metadata.schemaVersion}`,
+        `- Generated at: ${metadata.generatedAt}`,
+        `- Shape: ${metadata.shape}`,
+        `- Conditions: ${metadata.conditions.join(", ") || "none"}`,
+        `- Suggested action: ${metadata.primaryAction}`,
+      ].join("\n"),
+    );
+  }
+
+  sections.push(embeddedText.trim());
 
   for (const result of ocrResults) {
-    sections.push(`## ${result.pageLabel} OCR`, result.text.trim());
+    sections.push(
+      `## ${result.pageLabel} OCR`,
+      `Confidence: ${result.confidence}%\n\n${result.text.trim()}`,
+    );
   }
 
   return sections.filter(Boolean).join("\n\n");
@@ -29,8 +73,9 @@ export function buildHtml(
   fileName: string,
   embeddedText: string,
   ocrResults: OcrResult[],
+  metadata?: ExportMetadata,
 ) {
-  const markdown = buildMarkdown(fileName, embeddedText, ocrResults);
+  const markdown = buildMarkdown(fileName, embeddedText, ocrResults, metadata);
   const paragraphs = markdown
     .split(/\n{2,}/)
     .map((block) => {
@@ -59,6 +104,26 @@ ${paragraphs}
 </html>`;
 }
 
+export function buildExportMetadata(
+  fileName: string,
+  intelligence: PdfIntelligence,
+  appVersion: string,
+  commit: string,
+  generatedAt = new Date().toISOString(),
+): ExportMetadata {
+  return {
+    sourceId: intelligence.sourceId,
+    fileName,
+    appVersion,
+    commit,
+    schemaVersion: intelligence.schemaVersion,
+    generatedAt,
+    shape: intelligence.shape.id,
+    conditions: intelligence.conditions.map((condition) => condition.id).sort(),
+    primaryAction: intelligence.primaryAction,
+  };
+}
+
 function escapeHtml(value: string) {
   return value
     .replace(/&/g, "&amp;")
@@ -66,4 +131,19 @@ function escapeHtml(value: string) {
     .replace(/>/g, "&gt;")
     .replace(/"/g, "&quot;")
     .replace(/'/g, "&#039;");
+}
+
+function buildTextMetadata(metadata: ExportMetadata) {
+  return [
+    "PDF Workbench Export Metadata",
+    `Source ID: ${metadata.sourceId}`,
+    `File: ${metadata.fileName}`,
+    `App version: ${metadata.appVersion}`,
+    `Commit: ${metadata.commit}`,
+    `Schema: ${metadata.schemaVersion}`,
+    `Generated at: ${metadata.generatedAt}`,
+    `Shape: ${metadata.shape}`,
+    `Conditions: ${metadata.conditions.join(", ") || "none"}`,
+    `Suggested action: ${metadata.primaryAction}`,
+  ].join("\n");
 }
