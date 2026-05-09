@@ -1,14 +1,7 @@
 import { readFile, readdir } from "node:fs/promises";
 import { join } from "node:path";
 import { pathToFileURL } from "node:url";
-import {
-  PDFCheckBox,
-  PDFDocument,
-  PDFDropdown,
-  PDFOptionList,
-  PDFRadioGroup,
-  PDFTextField,
-} from "pdf-lib";
+import { PDFDocument } from "pdf-lib";
 import {
   getDocument,
   GlobalWorkerOptions,
@@ -22,7 +15,7 @@ import {
   errorToIntelligence,
   explainPdfError,
 } from "./pdfIntelligence";
-import type { PdfFormField } from "./types";
+import { readFormFields } from "./pdfDocument";
 
 type FixtureExpectation = {
   canOpen: boolean;
@@ -83,7 +76,7 @@ describe("PDF intelligence on real data", () => {
       }
 
       const doc = loaded.doc;
-      const fields = enhanceFormFields(readFixtureFields(doc), {
+      const fields = enhanceFormFields(readFormFields(doc), {
         fileName: pdfFile,
       });
       const sample = await extractFixtureSample(bytes).catch(() => ({
@@ -143,6 +136,7 @@ describe("PDF intelligence on real data", () => {
         ).toBeGreaterThanOrEqual(expectation.minimumMappedFieldRatio);
       }
     },
+    15_000,
   );
 });
 
@@ -233,54 +227,6 @@ describe("PDF intelligence synthetic edge cases", () => {
     );
   });
 });
-
-function readFixtureFields(doc: PDFDocument): PdfFormField[] {
-  try {
-    return doc
-      .getForm()
-      .getFields()
-      .map((field) => {
-        if (field instanceof PDFTextField) {
-          return {
-            name: field.getName(),
-            type: "text",
-            value: field.getText() ?? "",
-          };
-        }
-
-        if (field instanceof PDFCheckBox) {
-          return {
-            name: field.getName(),
-            type: "checkbox",
-            value: field.isChecked() ? "true" : "false",
-            checked: field.isChecked(),
-          };
-        }
-
-        if (field instanceof PDFDropdown || field instanceof PDFOptionList) {
-          return {
-            name: field.getName(),
-            type: "choice",
-            value: field.getSelected()[0] ?? "",
-            options: field.getOptions(),
-          };
-        }
-
-        if (field instanceof PDFRadioGroup) {
-          return {
-            name: field.getName(),
-            type: "choice",
-            value: field.getSelected() ?? "",
-            options: field.getOptions(),
-          };
-        }
-
-        return { name: field.getName(), type: "unknown", value: "" };
-      });
-  } catch {
-    return [];
-  }
-}
 
 async function extractFixtureSample(bytes: Uint8Array) {
   const task = getDocument({

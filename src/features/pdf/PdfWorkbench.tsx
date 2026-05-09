@@ -2,12 +2,18 @@ import {
   AlertTriangle,
   Brain,
   CheckCircle2,
+  Clipboard,
+  Copy,
+  Eraser,
   FileArchive,
   FileDown,
+  FileJson,
   FileText,
   Info,
+  Printer,
   RefreshCcw,
   RotateCw,
+  Save,
   ScanText,
   Sparkles,
   Trash2,
@@ -17,9 +23,17 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import type { ReactNode } from "react";
 import { downloadBlob, downloadText } from "../../lib/download";
 import {
+  clearActiveProjectArchive,
+  clearRecentProjects,
+  defaultSettings,
+  loadActiveProjectArchive,
   listRecentProjects,
+  loadUserSettings,
+  saveActiveProjectArchive,
   saveRecentProject,
+  saveUserSettings,
   type RecentProject,
+  type UserSettings,
 } from "../../lib/storage";
 import {
   buildExportMetadata,
@@ -34,6 +48,7 @@ import {
   explainPdfError,
   fieldConfidenceBand,
 } from "./pdfIntelligence";
+import { exportProjectArchive, importProjectArchive } from "./projectArchive";
 import {
   deletePage,
   movePage,
@@ -59,20 +74,36 @@ type OperationState = {
 };
 
 const pageListLimit = 80;
+const stateFileExtension = ".pdfwb.json";
+
+type BatchResult = {
+  id: string;
+  fileName: string;
+  status: "opened" | "imported" | "failed";
+  message: string;
+};
 
 export function PdfWorkbench() {
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const operationRef = useRef<OperationState | null>(null);
   const abortRef = useRef<AbortController | null>(null);
+  const handlersRef = useRef<{
+    handleFiles?: (files: File[] | FileList) => Promise<void>;
+    restoreProjectArchive?: (archiveJson: string, nextNotice: string) => void;
+  }>({});
   const [project, setProject] = useState<PdfProject | null>(null);
   const [selectedPageId, setSelectedPageId] = useState<string | null>(null);
   const [recentProjects, setRecentProjects] = useState<RecentProject[]>([]);
+  const [batchResults, setBatchResults] = useState<BatchResult[]>([]);
   const [operation, setOperation] = useState<OperationState | null>(null);
   const [notice, setNotice] = useState(
     "Open a PDF to start. Files stay in this browser session.",
   );
   const [error, setError] = useState<PdfUserError | null>(null);
   const [showAllPages, setShowAllPages] = useState(false);
+  const [isDragActive, setIsDragActive] = useState(false);
+  const [settings, setSettings] = useState<UserSettings>(defaultSettings);
+  const [localAiAvailable, setLocalAiAvailable] = useState(false);
   const [textStamp, setTextStamp] = useState({
     text: "Approved",
     x: 72,
@@ -90,8 +121,10 @@ export function PdfWorkbench() {
   const [signatureImage, setSignatureImage] = useState<string | undefined>();
   const [aiSummary, setAiSummary] = useState("");
   const debugEnabled = useMemo(
-    () => new URLSearchParams(window.location.search).get("debug") === "1",
-    [],
+    () =>
+      settings.showDebugPanel ||
+      new URLSearchParams(window.location.search).get("debug") === "1",
+    [settings.showDebugPanel],
   );
 
   const selectedPage = useMemo(
@@ -110,10 +143,98 @@ export function PdfWorkbench() {
     : "";
 
   useEffect(() => {
-    listRecentProjects()
-      .then(setRecentProjects)
-      .catch(() => setRecentProjects([]));
+    let cancelled = false;
+
+    async function boot() {
+      const [storedSettings, recent] = await Promise.all([
+        loadUserSettings().catch(() => defaultSettings),
+        listRecentProjects().catch(() => []),
+      ]);
+
+      if (cancelled) {
+        return;
+      }
+
+      setSettings(storedSettings);
+      setRecentProjects(recent);
+
+      if (storedSettings.autosaveProject) {
+        const archiveJson = await loadActiveProjectArchive().catch(() => null);
+        if (archiveJson && !cancelled) {
+          handlersRef.current.restoreProjectArchive?.(
+            archiveJson,
+            "Restored autosaved project.",
+          );
+        }
+      }
+    }
+
+    void boot();
+
+    return () => {
+      cancelled = true;
+    };
   }, []);
+
+  useEffect(() => {
+    import("./localAi")
+      .then((module) => setLocalAiAvailable(module.hasLocalLanguageModel()))
+      .catch(() => setLocalAiAvailable(false));
+  }, []);
+
+  useEffect(() => {
+    function handlePaste(event: ClipboardEvent) {
+      const target = event.target;
+
+      if (
+        target instanceof HTMLInputElement ||
+        target instanceof HTMLTextAreaElement ||
+        target instanceof HTMLSelectElement
+      ) {
+        return;
+      }
+
+      const files = Array.from(event.clipboardData?.files ?? []);
+      const text = event.clipboardData?.getData("text/plain") ?? "";
+
+      if (files.length) {
+        event.preventDefault();
+        void handlersRef.current.handleFiles?.(files);
+      } else if (looksLikeArchiveJson(text)) {
+        event.preventDefault();
+        handlersRef.current.restoreProjectArchive?.(
+          text,
+          "Imported project from pasted state.",
+        );
+      }
+    }
+
+    window.addEventListener("paste", handlePaste);
+    return () => window.removeEventListener("paste", handlePaste);
+  }, []);
+
+  useEffect(() => {
+    if (!settings.autosaveProject || !project) {
+      return;
+    }
+
+    const timeout = window.setTimeout(() => {
+      void saveActiveProjectArchive(
+        exportProjectArchive(
+          project,
+          selectedPageId,
+          __APP_VERSION__,
+          __COMMIT_SHA__,
+        ),
+      ).catch(() => undefined);
+    }, 450);
+
+    return () => window.clearTimeout(timeout);
+  }, [project, selectedPageId, settings.autosaveProject]);
+
+  useEffect(() => {
+    void saveUserSettings(settings).catch(() => undefined);
+  }, [settings]);
 
   function beginOperation(label: string, cancellable = false) {
     const controller = new AbortController();
@@ -183,11 +304,64 @@ export function PdfWorkbench() {
     );
   }
 
-  async function handleFile(file: File | undefined) {
-    if (!file) {
+  async function handleFiles(files: File[] | FileList) {
+    const incoming = Array.from(files);
+
+    if (!incoming.length) {
       return;
     }
 
+    const results: BatchResult[] = [];
+
+    for (const file of incoming) {
+      if (isProjectStateFile(file)) {
+        const result = await openProjectStateFile(file);
+        results.push(result);
+      } else if (isPdfFile(file)) {
+        const result = await openPdfFile(file);
+        results.push(result);
+      } else {
+        results.push({
+          id: crypto.randomUUID(),
+          fileName: file.name,
+          status: "failed",
+          message:
+            "Only PDF files and .pdfwb.json project state files are supported.",
+        });
+      }
+    }
+
+    setBatchResults(results.slice(-8));
+  }
+
+  async function openProjectStateFile(file: File): Promise<BatchResult> {
+    try {
+      restoreProjectArchive(
+        await file.text(),
+        `Imported ${file.name}. Project state restored.`,
+      );
+
+      return {
+        id: crypto.randomUUID(),
+        fileName: file.name,
+        status: "imported",
+        message: "Project state imported.",
+      };
+    } catch (err) {
+      const friendly = importError(err);
+      setError(friendly);
+      setNotice(friendly.what);
+
+      return {
+        id: crypto.randomUUID(),
+        fileName: file.name,
+        status: "failed",
+        message: friendly.title,
+      };
+    }
+  }
+
+  async function openPdfFile(file: File): Promise<BatchResult> {
     const op = beginOperation("Opening PDF...");
     setError(null);
     setAiSummary("");
@@ -239,20 +413,53 @@ export function PdfWorkbench() {
       };
 
       if (!isCurrentOperation(op.id)) {
-        return;
+        return {
+          id: crypto.randomUUID(),
+          fileName: file.name,
+          status: "failed",
+          message: "Operation was superseded.",
+        };
       }
 
       setProject(analyzedProject);
       setSelectedPageId(analyzedProject.pages[0]?.id ?? null);
       setNotice(`Opened ${loaded.fileName}. ${intelligence.summary}`);
       await rememberProject(analyzedProject);
+
+      return {
+        id: crypto.randomUUID(),
+        fileName: file.name,
+        status: "opened",
+        message: intelligence.shape.label,
+      };
     } catch (err) {
       const friendly = explainPdfError(err);
       setError(friendly);
       setNotice(friendly.what);
+
+      return {
+        id: crypto.randomUUID(),
+        fileName: file.name,
+        status: "failed",
+        message: friendly.title,
+      };
     } finally {
       finishOperation(op.id);
     }
+  }
+
+  function restoreProjectArchive(archiveJson: string, nextNotice: string) {
+    const restored = importProjectArchive(archiveJson);
+    setProject(restored.project);
+    setSelectedPageId(
+      selectedOrFirstVisible(restored.project.pages, restored.selectedPageId)
+        ?.id ?? null,
+    );
+    setError(null);
+    setAiSummary("");
+    setShowAllPages(false);
+    setNotice(nextNotice);
+    void rememberProject(restored.project);
   }
 
   function updateProject(updater: (project: PdfProject) => PdfProject) {
@@ -592,8 +799,187 @@ export function PdfWorkbench() {
     appendActivity("export", `Downloaded ${kind.toUpperCase()} text export`);
   }
 
+  async function copyTextOutput() {
+    if (!project || !allText.trim()) {
+      return;
+    }
+
+    try {
+      await navigator.clipboard.writeText(allText);
+      appendActivity("export", "Copied text output to clipboard");
+      setNotice("Text output copied to clipboard.");
+    } catch (err) {
+      setError({
+        kind: "unsupported_pdf",
+        title: "Clipboard copy was blocked",
+        what: "The browser did not allow PDF Workbench to write to the clipboard.",
+        why:
+          err instanceof Error ? err.message : "Clipboard permission failed.",
+        nextStep: "Use the TXT/Markdown/HTML download buttons instead.",
+        recoverable: true,
+      });
+    }
+  }
+
+  function downloadProjectState() {
+    if (!project) {
+      return;
+    }
+
+    downloadText(
+      exportProjectArchive(
+        project,
+        selectedPageId,
+        __APP_VERSION__,
+        __COMMIT_SHA__,
+      ),
+      `${baseName(project.fileName)}${stateFileExtension}`,
+      "application/json",
+    );
+    appendActivity("export", "Downloaded project state");
+    setNotice("Project state downloaded. Re-import it later to continue.");
+  }
+
+  function printProject() {
+    window.print();
+    appendActivity("export", "Opened print dialog");
+  }
+
+  async function pasteFromClipboard() {
+    if (!("clipboard" in navigator) || !("read" in navigator.clipboard)) {
+      setNotice(
+        "Clipboard file read is unavailable here. Press Ctrl/Command+V after copying a PDF or project state file.",
+      );
+      return;
+    }
+
+    try {
+      const items = await navigator.clipboard.read();
+
+      for (const item of items) {
+        const pdfType = item.types.find((type) => type === "application/pdf");
+        const jsonType = item.types.find(
+          (type) => type === "application/json" || type === "text/plain",
+        );
+
+        if (pdfType) {
+          const blob = await item.getType(pdfType);
+          await handleFiles([
+            new File([blob], "clipboard.pdf", { type: "application/pdf" }),
+          ]);
+          return;
+        }
+
+        if (jsonType) {
+          const text = await (await item.getType(jsonType)).text();
+          if (looksLikeArchiveJson(text)) {
+            restoreProjectArchive(text, "Imported project from clipboard.");
+            return;
+          }
+        }
+      }
+
+      setNotice(
+        "Clipboard did not contain a PDF or PDF Workbench project state.",
+      );
+    } catch (err) {
+      setError({
+        kind: "unsupported_pdf",
+        title: "Clipboard read was blocked",
+        what: "The browser did not grant access to clipboard files.",
+        why:
+          err instanceof Error ? err.message : "Clipboard permission failed.",
+        nextStep:
+          "Use Open PDF, drag and drop, or press Ctrl/Command+V as a fallback.",
+        recoverable: true,
+      });
+    }
+  }
+
+  async function loadSamplePdf() {
+    const { PDFDocument, StandardFonts, rgb } = await import("pdf-lib");
+    const pdf = await PDFDocument.create();
+    const page = pdf.addPage([612, 792]);
+    const font = await pdf.embedFont(StandardFonts.Helvetica);
+    page.drawText("PDF Workbench sample", {
+      x: 72,
+      y: 720,
+      size: 24,
+      font,
+      color: rgb(0.08, 0.25, 0.29),
+    });
+    page.drawText(
+      "Try rotating, adding a text stamp, extracting text, then exporting state.",
+      {
+        x: 72,
+        y: 680,
+        size: 12,
+        font,
+        color: rgb(0.18, 0.22, 0.3),
+        maxWidth: 460,
+      },
+    );
+
+    const saved = await pdf.save();
+    const buffer = new ArrayBuffer(saved.byteLength);
+    new Uint8Array(buffer).set(saved);
+
+    await handleFiles([
+      new File([buffer], "pdf-workbench-sample.pdf", {
+        type: "application/pdf",
+      }),
+    ]);
+  }
+
+  async function startFresh() {
+    if (
+      settings.confirmPageDelete &&
+      !window.confirm("Clear the current project from this browser?")
+    ) {
+      return;
+    }
+
+    setProject(null);
+    setSelectedPageId(null);
+    setAiSummary("");
+    setError(null);
+    setBatchResults([]);
+    setNotice("Started fresh. Open a PDF when you are ready.");
+    await clearActiveProjectArchive();
+  }
+
+  async function clearHistory() {
+    await clearRecentProjects();
+    setRecentProjects([]);
+    setNotice("Recent project metadata cleared.");
+  }
+
+  function updateSettings(patch: Partial<UserSettings>) {
+    setSettings((current) => ({ ...current, ...patch }));
+  }
+
+  handlersRef.current = { handleFiles, restoreProjectArchive };
+
   return (
-    <section className="workbench" aria-label="PDF Workbench">
+    <section
+      className="workbench"
+      aria-label="PDF Workbench"
+      data-drag-active={isDragActive}
+      onDragOver={(event) => {
+        event.preventDefault();
+        setIsDragActive(true);
+      }}
+      onDragLeave={(event) => {
+        if (event.currentTarget === event.target) {
+          setIsDragActive(false);
+        }
+      }}
+      onDrop={(event) => {
+        event.preventDefault();
+        setIsDragActive(false);
+        void handleFiles(event.dataTransfer.files);
+      }}
+    >
       <aside className="side-panel">
         <div className="panel-section">
           <p className="panel-kicker">Document</p>
@@ -601,8 +987,14 @@ export function PdfWorkbench() {
             ref={fileInputRef}
             data-testid="pdf-input"
             type="file"
-            accept="application/pdf"
-            onChange={(event) => handleFile(event.target.files?.[0])}
+            multiple
+            accept="application/pdf,.pdf,.pdfwb.json,application/json"
+            onChange={(event) => {
+              if (event.target.files) {
+                void handleFiles(event.target.files);
+              }
+              event.currentTarget.value = "";
+            }}
           />
           <button
             type="button"
@@ -610,8 +1002,21 @@ export function PdfWorkbench() {
             onClick={() => fileInputRef.current?.click()}
           >
             <FileArchive aria-hidden="true" />
-            Open PDF
+            Open PDF or state
           </button>
+          <div className="button-grid">
+            <button type="button" onClick={loadSamplePdf}>
+              <FileText aria-hidden="true" />
+              Sample
+            </button>
+            <button type="button" onClick={pasteFromClipboard}>
+              <Clipboard aria-hidden="true" />
+              Paste
+            </button>
+          </div>
+          <p className="fine-print">
+            Drag PDFs or .pdfwb.json state files anywhere onto the workbench.
+          </p>
           {project ? (
             <dl className="document-facts">
               <div>
@@ -632,7 +1037,33 @@ export function PdfWorkbench() {
               </div>
             </dl>
           ) : null}
+          {project ? (
+            <div className="button-grid">
+              <button type="button" onClick={downloadProjectState}>
+                <Save aria-hidden="true" />
+                Save state
+              </button>
+              <button type="button" onClick={startFresh}>
+                <Eraser aria-hidden="true" />
+                Start fresh
+              </button>
+            </div>
+          ) : null}
         </div>
+
+        {batchResults.length ? (
+          <div className="panel-section">
+            <p className="panel-kicker">Batch intake</p>
+            <ul className="batch-list">
+              {batchResults.map((result) => (
+                <li key={result.id} data-status={result.status}>
+                  <span>{result.fileName}</span>
+                  <small>{result.message}</small>
+                </li>
+              ))}
+            </ul>
+          </div>
+        ) : null}
 
         {project ? (
           <div className="panel-section">
@@ -707,16 +1138,25 @@ export function PdfWorkbench() {
         <div className="panel-section">
           <p className="panel-kicker">Recent</p>
           {recentProjects.length ? (
-            <ul className="recent-list">
-              {recentProjects.map((item) => (
-                <li key={item.id}>
-                  <span>{item.fileName}</span>
-                  <small>
-                    {item.pageCount} pages · {item.ocrPages} OCR
-                  </small>
-                </li>
-              ))}
-            </ul>
+            <>
+              <ul className="recent-list">
+                {recentProjects.map((item) => (
+                  <li key={item.id}>
+                    <span>{item.fileName}</span>
+                    <small>
+                      {item.pageCount} pages · {item.ocrPages} OCR
+                    </small>
+                  </li>
+                ))}
+              </ul>
+              <button
+                type="button"
+                className="ghost-button"
+                onClick={clearHistory}
+              >
+                Clear recent
+              </button>
+            </>
           ) : (
             <p className="muted">No local project history yet.</p>
           )}
@@ -787,6 +1227,13 @@ export function PdfWorkbench() {
                   type="button"
                   className="danger-button"
                   onClick={() => {
+                    if (
+                      settings.confirmPageDelete &&
+                      !window.confirm(`Delete ${selectedPage.label}?`)
+                    ) {
+                      return;
+                    }
+
                     const nextPages = deletePage(
                       project.pages,
                       selectedPage.id,
@@ -851,6 +1298,20 @@ export function PdfWorkbench() {
           <div className="button-grid">
             <button
               type="button"
+              disabled={!project}
+              onClick={downloadProjectState}
+            >
+              <FileJson aria-hidden="true" />
+              State
+            </button>
+            <button type="button" disabled={!project} onClick={printProject}>
+              <Printer aria-hidden="true" />
+              Print
+            </button>
+          </div>
+          <div className="button-grid">
+            <button
+              type="button"
               disabled={!project || !allText}
               onClick={() => downloadExport("txt")}
             >
@@ -869,6 +1330,14 @@ export function PdfWorkbench() {
               onClick={() => downloadExport("html")}
             >
               HTML
+            </button>
+            <button
+              type="button"
+              disabled={!project || !allText}
+              onClick={copyTextOutput}
+            >
+              <Copy aria-hidden="true" />
+              Copy
             </button>
           </div>
         </ToolSection>
@@ -1064,13 +1533,68 @@ export function PdfWorkbench() {
           ) : null}
           <button
             type="button"
-            disabled={!allText || Boolean(busy)}
+            disabled={!allText || Boolean(busy) || !localAiAvailable}
             onClick={summarizeText}
           >
             <Sparkles aria-hidden="true" />
             Summarize with local model
           </button>
+          {!localAiAvailable ? (
+            <p className="fine-print">
+              Local AI is hidden by most browsers. Text extraction and OCR still
+              work fully without it.
+            </p>
+          ) : null}
           {aiSummary ? <pre className="ai-summary">{aiSummary}</pre> : null}
+        </ToolSection>
+
+        <ToolSection title="Settings">
+          <div className="settings-list">
+            <label>
+              <input
+                type="checkbox"
+                checked={settings.autosaveProject}
+                onChange={(event) =>
+                  updateSettings({ autosaveProject: event.target.checked })
+                }
+              />
+              Autosave this project in this browser
+            </label>
+            <label>
+              <input
+                type="checkbox"
+                checked={settings.showDebugPanel}
+                onChange={(event) =>
+                  updateSettings({ showDebugPanel: event.target.checked })
+                }
+              />
+              Show debug panel
+            </label>
+            <label>
+              <input
+                type="checkbox"
+                checked={settings.confirmPageDelete}
+                onChange={(event) =>
+                  updateSettings({ confirmPageDelete: event.target.checked })
+                }
+              />
+              Confirm destructive clears
+            </label>
+          </div>
+          <div className="button-grid">
+            <button type="button" onClick={startFresh}>
+              <Eraser aria-hidden="true" />
+              Clear project
+            </button>
+            <button type="button" onClick={clearHistory}>
+              <Trash2 aria-hidden="true" />
+              Clear recent
+            </button>
+          </div>
+          <p className="fine-print">
+            Autosave is local IndexedDB only. Nothing is uploaded by PDF
+            Workbench.
+          </p>
         </ToolSection>
 
         {project ? (
@@ -1303,4 +1827,36 @@ function NumberInput({
 
 function baseName(fileName: string) {
   return fileName.replace(/\.pdf$/i, "");
+}
+
+function isPdfFile(file: File) {
+  return (
+    file.type === "application/pdf" || file.name.toLowerCase().endsWith(".pdf")
+  );
+}
+
+function isProjectStateFile(file: File) {
+  return file.name.toLowerCase().endsWith(stateFileExtension);
+}
+
+function looksLikeArchiveJson(text: string) {
+  return (
+    text.includes('"schemaVersion"') &&
+    text.includes("pdf-workbench.project.v1")
+  );
+}
+
+function importError(error: unknown): PdfUserError {
+  return {
+    kind: "unsupported_pdf",
+    title: "Project state could not be imported",
+    what: "The selected file is not a valid PDF Workbench project state file.",
+    why:
+      error instanceof Error
+        ? error.message
+        : "The archive JSON did not match the expected schema.",
+    nextStep:
+      "Choose a .pdfwb.json file exported by PDF Workbench v0.3.0 or newer.",
+    recoverable: true,
+  };
 }

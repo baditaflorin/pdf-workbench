@@ -152,6 +152,11 @@ button {
   margin: 0 auto;
 }
 
+.workbench[data-drag-active="true"] {
+  outline: 3px solid rgba(20, 63, 74, 0.45);
+  outline-offset: 4px;
+}
+
 .side-panel,
 .tool-panel,
 .preview-panel {
@@ -303,6 +308,34 @@ button {
   padding: 0;
   margin: 0;
   list-style: none;
+}
+
+.batch-list {
+  display: grid;
+  gap: 8px;
+  padding: 0;
+  margin: 0;
+  list-style: none;
+}
+
+.batch-list li {
+  display: grid;
+  gap: 3px;
+  padding: 10px;
+  border: 1px solid rgba(23, 32, 51, 0.1);
+  border-radius: 8px;
+  background: #faf9f6;
+}
+
+.batch-list li[data-status="failed"] {
+  border-color: rgba(139, 45, 43, 0.25);
+  background: #fff4f0;
+}
+
+.batch-list li[data-status="imported"],
+.batch-list li[data-status="opened"] {
+  border-color: rgba(49, 93, 100, 0.22);
+  background: #f1f7f4;
 }
 
 .recent-list li {
@@ -657,9 +690,68 @@ button {
   color: #8b2d2b;
 }
 
+.settings-list {
+  display: grid;
+  gap: 8px;
+}
+
+.settings-list label {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 8px;
+  align-items: center;
+  margin: 0;
+  color: #3d4b5f;
+}
+
+.settings-list input[type="checkbox"] {
+  width: auto;
+  min-height: auto;
+}
+
 .signature-pad {
   display: grid;
   gap: 8px;
+}
+
+@media print {
+  .topbar,
+  .side-panel,
+  .tool-panel,
+  .status-row,
+  .page-toolbar,
+  .edit-badges {
+    display: none !important;
+  }
+
+  .app-shell {
+    padding: 0;
+    background: #ffffff;
+  }
+
+  .workbench {
+    display: block;
+    width: 100%;
+  }
+
+  .preview-panel {
+    min-height: auto;
+    border: 0;
+    box-shadow: none;
+  }
+
+  .preview-frame {
+    min-height: auto;
+    padding: 0;
+    overflow: visible;
+    background: #ffffff;
+  }
+
+  .preview-frame canvas {
+    width: 100% !important;
+    max-width: 100%;
+    box-shadow: none;
+  }
 }
 
 .signature-pad canvas {

@@ -108,7 +108,7 @@ export async function exportPdf(project: PdfProject) {
   return new Blob([arrayBuffer], { type: "application/pdf" });
 }
 
-function readFormFields(doc: PDFDocument): PdfFormField[] {
+export function readFormFields(doc: PDFDocument): PdfFormField[] {
   try {
     return doc
       .getForm()
