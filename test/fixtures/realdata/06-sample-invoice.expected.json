@@ -1,0 +1,11 @@
+{
+  "id": "06-sample-invoice",
+  "sourceUrl": "https://isaw.nyu.edu/guide/finance/forms-docs/sample-vendor-invoice/@@download/file/Sample%20Vendor%20Invoice.pdf",
+  "canOpen": true,
+  "pageCount": 1,
+  "minFormFields": 0,
+  "expectedConditions": ["structured_text"],
+  "expectedShape": "invoice",
+  "minimumTextCharacters": 200,
+  "primaryAction": "extract_key_values"
+}

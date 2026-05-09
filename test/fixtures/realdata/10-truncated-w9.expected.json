@@ -1,0 +1,9 @@
+{
+  "id": "10-truncated-w9",
+  "sourceUrl": "derived from https://www.irs.gov/pub/irs-pdf/fw9.pdf",
+  "canOpen": false,
+  "expectedConditions": ["corrupted", "partial_pdf"],
+  "expectedShape": "damaged_pdf",
+  "expectedErrorKind": "corrupt_pdf",
+  "primaryAction": "replace_file"
+}

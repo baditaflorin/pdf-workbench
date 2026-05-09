@@ -1,0 +1,11 @@
+{
+  "id": "09-hebrew-introductions",
+  "sourceUrl": "https://www.linguajunkie.com/wp-content/uploads/Hebrew_Introductions-1.pdf",
+  "canOpen": true,
+  "pageCount": 2,
+  "minFormFields": 0,
+  "expectedConditions": ["mixed_language", "rtl_text"],
+  "expectedShape": "language_lesson",
+  "minimumTextCharacters": 200,
+  "primaryAction": "verify_reading_order"
+}

@@ -1,0 +1,11 @@
+{
+  "id": "03-irs-w9",
+  "sourceUrl": "https://www.irs.gov/pub/irs-pdf/fw9.pdf",
+  "canOpen": true,
+  "pageCount": 6,
+  "minFormFields": 23,
+  "expectedConditions": ["fillable_form", "government_form", "xfa_form"],
+  "expectedShape": "tax_form",
+  "minimumMappedFieldRatio": 0.8,
+  "primaryAction": "complete_form"
+}

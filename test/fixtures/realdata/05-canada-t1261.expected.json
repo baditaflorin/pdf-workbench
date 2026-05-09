@@ -1,0 +1,9 @@
+{
+  "id": "05-canada-t1261",
+  "sourceUrl": "https://www.canada.ca/content/dam/cra-arc/formspubs/pbg/t1261/t1261-fill-23e.pdf",
+  "canOpen": false,
+  "expectedConditions": ["encrypted", "restricted_pdf", "xfa_form"],
+  "expectedShape": "government_form",
+  "expectedErrorKind": "encrypted_pdf",
+  "primaryAction": "unlock_or_flatten"
+}

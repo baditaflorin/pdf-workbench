@@ -1,0 +1,11 @@
+{
+  "id": "04-uscis-i9",
+  "sourceUrl": "https://www.uscis.gov/sites/default/files/document/forms/i-9.pdf",
+  "canOpen": true,
+  "pageCount": 4,
+  "minFormFields": 120,
+  "expectedConditions": ["fillable_form", "government_form"],
+  "expectedShape": "employment_form",
+  "minimumMappedFieldRatio": 0.8,
+  "primaryAction": "complete_form"
+}

@@ -1,0 +1,11 @@
+{
+  "id": "02-arxiv-attention",
+  "sourceUrl": "https://arxiv.org/pdf/1706.03762",
+  "canOpen": true,
+  "pageCount": 15,
+  "minFormFields": 0,
+  "expectedConditions": ["dense_text", "structured_text"],
+  "expectedShape": "academic_paper",
+  "minimumTextCharacters": 1000,
+  "primaryAction": "extract_outline"
+}

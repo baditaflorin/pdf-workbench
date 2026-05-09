@@ -1,0 +1,11 @@
+{
+  "id": "07-jfk-scan",
+  "sourceUrl": "https://www.archives.gov/files/research/jfk/releases/2025/0318/104-10181-10007.pdf",
+  "canOpen": true,
+  "pageCount": 122,
+  "minFormFields": 0,
+  "expectedConditions": ["scanned", "large_document"],
+  "expectedShape": "scanned_archive",
+  "maximumEmbeddedTextCharacters": 500,
+  "primaryAction": "ocr_with_confidence"
+}

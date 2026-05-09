@@ -1,0 +1,16 @@
+{
+  "id": "08-irs-pub17",
+  "sourceUrl": "https://www.irs.gov/pub/irs-pdf/p17.pdf",
+  "canOpen": true,
+  "pageCount": 142,
+  "minFormFields": 0,
+  "expectedConditions": [
+    "large_document",
+    "dense_text",
+    "structured_text",
+    "government_publication"
+  ],
+  "expectedShape": "government_publication",
+  "minimumTextCharacters": 1000,
+  "primaryAction": "extract_outline"
+}

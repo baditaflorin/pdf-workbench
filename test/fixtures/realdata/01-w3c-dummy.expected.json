@@ -1,0 +1,11 @@
+{
+  "id": "01-w3c-dummy",
+  "sourceUrl": "https://www.w3.org/WAI/ER/tests/xhtml/testfiles/resources/pdf/dummy.pdf",
+  "canOpen": true,
+  "pageCount": 1,
+  "minFormFields": 0,
+  "expectedConditions": ["clean_text"],
+  "expectedShape": "generic_pdf",
+  "minimumTextCharacters": 10,
+  "primaryAction": "review"
+}
