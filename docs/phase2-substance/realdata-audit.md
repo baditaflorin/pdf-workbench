@@ -61,6 +61,10 @@ Clear failure or unusable flow: 3/10.
 
 The biggest issue is not that v1 crashes. It usually does not. The issue is that it treats every PDF as pages plus raw text, even when the document is obviously a form, scan, invoice, paper, large publication, encrypted file, or corrupted upload.
 
+## Phase 2 Pass-Rate Trend
+
+After implementing the Phase 2 intelligence layer, all 10 fixtures receive the expected document-condition label and primary action in the automated fixture suite. The practical pass rate moved from 1/10 clear pass to 8/10 useful first guess or actionable recovery path. The remaining partial cases are semantic extraction for academic-paper outlines and invoice key values: the app recognizes those shapes but does not yet extract full structured records.
+
 ## Top 5 Logic Gaps
 
 1. PDF condition detection is missing. The app does not classify encrypted, corrupted, scanned, large, form-heavy, mixed-language, or structure-rich PDFs before choosing a workflow.
