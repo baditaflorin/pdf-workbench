@@ -85,6 +85,7 @@ type BatchResult = {
 
 export function PdfWorkbench() {
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const mergeInputRef = useRef<HTMLInputElement | null>(null);
   const operationRef = useRef<OperationState | null>(null);
   const abortRef = useRef<AbortController | null>(null);
   const handlersRef = useRef<{
@@ -733,6 +734,42 @@ export function PdfWorkbench() {
     }
   }
 
+  async function mergePdfsFromInput(files: FileList | null) {
+    if (!files || files.length === 0) {
+      return;
+    }
+    const incoming = Array.from(files).filter((file) => isPdfFile(file));
+    if (incoming.length < 2) {
+      setNotice(
+        "Pick at least two PDF files to merge — single-PDF selections are opened normally.",
+      );
+      return;
+    }
+    const op = beginOperation(
+      `Merging ${incoming.length} PDFs in upload order...`,
+    );
+    setError(null);
+    try {
+      const { mergePdfFiles } = await import("./pdfDocument");
+      const blob = await mergePdfFiles(incoming);
+      const base = baseName(incoming[0].name);
+      downloadBlob(blob, `${base}-merged.pdf`);
+      appendActivity(
+        "export",
+        `Merged ${incoming.length} PDFs into a single file`,
+      );
+      setNotice(
+        `Merged ${incoming.length} PDFs (${incoming.map((f) => f.name).join(", ")}) and downloaded the combined document.`,
+      );
+    } catch (err) {
+      const friendly = explainPdfError(err);
+      setError(friendly);
+      setNotice(friendly.what);
+    } finally {
+      finishOperation(op.id);
+    }
+  }
+
   async function exportEditedPdf() {
     if (!project) {
       return;
@@ -1003,6 +1040,26 @@ export function PdfWorkbench() {
           >
             <FileArchive aria-hidden="true" />
             Open PDF or state
+          </button>
+          <input
+            ref={mergeInputRef}
+            type="file"
+            multiple
+            accept="application/pdf,.pdf"
+            style={{ display: "none" }}
+            onChange={(event) => {
+              void mergePdfsFromInput(event.target.files);
+              event.currentTarget.value = "";
+            }}
+          />
+          <button
+            type="button"
+            className="primary-button"
+            onClick={() => mergeInputRef.current?.click()}
+            title="Pick two or more PDFs to combine into a single file"
+          >
+            <FileArchive aria-hidden="true" />
+            Merge PDFs
           </button>
           <div className="button-grid">
             <button type="button" onClick={loadSamplePdf}>

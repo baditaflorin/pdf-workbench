@@ -108,6 +108,58 @@ export async function exportPdf(project: PdfProject) {
   return new Blob([arrayBuffer], { type: "application/pdf" });
 }
 
+// mergePdfBytes concatenates every visible page from each input PDF into a
+// single output document, in the order the files are provided. Page rotations
+// are preserved; forms, stamps, and OCR layers from the upstream projects are
+// intentionally dropped because they only have meaning in their original
+// document context. Returns the merged PDF as a Uint8Array so the caller can
+// wrap it in a Blob (browser) or write it to disk (tests / Node tooling).
+//
+// This is the most-requested missing Acrobat operation; the rest of the
+// workbench focuses on editing one PDF at a time, but real users routinely
+// need "combine this stack of scans into a single file" before they can do
+// anything else with it.
+export async function mergePdfBytes(
+  sources: Array<{ name: string; bytes: Uint8Array }>,
+): Promise<{ bytes: Uint8Array; pageCount: number }> {
+  if (sources.length === 0) {
+    throw new Error("mergePdfBytes requires at least one source PDF");
+  }
+  const output = await PDFDocument.create();
+  for (const source of sources) {
+    let doc: PDFDocument;
+    try {
+      doc = await PDFDocument.load(copyBytes(source.bytes));
+    } catch (cause) {
+      const reason = cause instanceof Error ? cause.message : "unknown error";
+      throw new Error(
+        `Could not open "${source.name}" as a PDF (${reason})`,
+        cause instanceof Error ? { cause } : undefined,
+      );
+    }
+    const indices = doc.getPages().map((_, index) => index);
+    const copied = await output.copyPages(doc, indices);
+    for (const page of copied) {
+      output.addPage(page);
+    }
+  }
+  const bytes = await output.save();
+  return { bytes, pageCount: output.getPageCount() };
+}
+
+export async function mergePdfFiles(files: File[]): Promise<Blob> {
+  const sources = await Promise.all(
+    files.map(async (file) => ({
+      name: file.name,
+      bytes: new Uint8Array(await file.arrayBuffer()),
+    })),
+  );
+  const { bytes } = await mergePdfBytes(sources);
+  const buffer = new ArrayBuffer(bytes.byteLength);
+  new Uint8Array(buffer).set(bytes);
+  return new Blob([buffer], { type: "application/pdf" });
+}
+
 export function readFormFields(doc: PDFDocument): PdfFormField[] {
   try {
     return doc
